@@ -31,9 +31,10 @@ TIMER_WIDTH=100
 TIMER_HEIGHT=70
 EXIT_WIDTH=50
 EXIT_HEIGHT=50
-
 LINE_THICKNESS=10
 LINE_LENGTH=360
+
+TIME_ATTACK_DURATION = 30  #seconds
 # __________Sound Effects__________________________________________
 
 whoosh  = pygame.mixer.Sound(os.path.join("Sound","whoosh.wav"))
@@ -270,13 +271,22 @@ def normalise_selection(x,y):
     y=y-35
     row = x//120
     col = y//120
-    print(x,row)
+    
     return(row,col)
 
 
 #loops through the game boards to check if there is a 3 in a row anywhere
 
-def victory_conditions():#the victory variable is set equal to the player who has won.
+#check if board is full 
+def is_board_full():
+    for row in range(BOARD_ROWS):
+        for col in range(BOARD_COLUMNS):
+            if board[row][col]==0:
+                return False
+    return True
+
+
+def victory_conditions():#the victory variable is set equal to the player who has won... returns 3 for a tie
     victory=0
     for row in range(BOARD_ROWS):
         for col in range(BOARD_COLUMNS):
@@ -299,10 +309,14 @@ def victory_conditions():#the victory variable is set equal to the player who ha
             if row ==1 and col==1 :
                 if board[row-1][col+1] == board[row][col] == board[row+1][col-1] !=0:
                         victory=board[row][col]
+            
+            if is_board_full()==True:
+                victory = 3
+
                         
             if victory!=0:
                 return victory
-                break
+    return victory
 
 
 #marks a square if it is availbale when a player selects that square
@@ -319,13 +333,6 @@ def mark_square(row,col,player):
 def available_square(row,col):
     return board[row][col]==0
 
-#check if baord if full 
-def is_board_full():
-    for row in range(BOARD_ROWS):
-        for col in range(BOARD_COLUMNS):
-            if board[row][col]==0:
-                return False
-    return True
 
 # loops through the board an updates the images to the corresponding player selcted squares
 def update_square_imgs():
@@ -461,7 +468,7 @@ def main():
 
     score   = 0
     player  = 1
-    counter = 5
+    counter = TIME_ATTACK_DURATION 
     alpha   = 0
 
     while run ==True:
@@ -490,8 +497,8 @@ def main():
                     main()
 
                 if time_attack_layer.collidepoint(event.pos): #time attack button is clicked
-                    crash.play() #play crash sound
                     time_attack=True
+                    crash.play() #play crash sound
 
                 if classic_layer.collidepoint(event.pos):     #classic button is clicked
                     classic=True
@@ -499,12 +506,15 @@ def main():
                 
                 
                 # game board is clicked on when intro is finished
-                # intro finishes when the x coordinate of the exit layer equals ten.
+                # intro finishes when the x coordinate of the exit layer equals ten
+                # starts the game (when the board is in the correct position) for both game modes
                 if game_board_layer.collidepoint(event.pos) and exit_layer.x==10:  
                     game_ready=True
-                    if time_attack == True and timer_started== False:
+
+                    if time_attack == True and timer_started == False: #first click on gameboard initializes the timer
                         start_timer()
                         timer_started=True
+                        timer_ended=False
                 
                     if game_ready:
                         row= normalise_selection(clicked_X,clicked_Y)[0]
@@ -542,7 +552,6 @@ def main():
         # game board fades in as the scoreboard enters the screen
 
         draw_game_board(calc_alpha_fade_in(scoreboard_layer,alpha),vert_line1_layer,vert_line2_layer,hor_line1_layer,hor_line2_layer)
-
         draw_road(road1_layer,road2_layer,road3_layer,road4_layer)
         draw_scoreboard(scoreboard_layer)
         draw_menu_bar(menu_bar_layer,game_mode_layer,time_attack_layer,classic_layer)
@@ -551,8 +560,10 @@ def main():
         draw_bus(bus_layer)
         draw_victory_drive(victory_bus)
         draw_exit(exit_layer)
+
         if time_attack==True or classic==True:
             update_square_imgs()
+
         #makes the curser change when the buttons are hovered over
         btn_hover(time_attack_layer,classic_layer)
 
@@ -560,37 +571,66 @@ def main():
         if time_attack==True:
             draw_timer(timer_layer,scoreboard_layer,counter)
             if counter==0:
+                timer_ended=True
                 draw_ta_result(ta_result_layer,score_layer,score)
+            
+            #check if there is a victory
+            if victory_conditions()==1:
+                print("victory")
+                score+=1
+                
+                
+            #check if there is a loss
+            if victory_conditions()==2:
+                print("loser")
+            
+
+            #stop game board from being clickable when the time ends
+
+
         
         if classic==True:
             draw_score(score_layer,score)
         
-        if victory_conditions()==1:
-            print("victory")
-            victory_parade=True
+            if victory_conditions()==1:
+                print("victory")
+                victory_parade=True
 
-        if victory_conditions()==2:
-            big_time_loser=True
-            print("loser")
-            pygame.time.wait(1000)
-            reset_board()
+            if victory_conditions()==2:
+                big_time_loser=True
+                print("loser")
+                pygame.time.wait(1000)
+                reset_board()
 
-        if victory_bus.x>900: 
-            score+=1
-            reset_board()
-            victory_parade=False
-            reset_victory_bus(victory_bus)
-        if victory_bus.x==0:
-            yay.play()
-        if victory_parade:
-            move_victory_bus(victory_bus)
+            if victory_bus.x>900: 
+                score+=1
+                reset_board()
+                victory_parade=False
+                reset_victory_bus(victory_bus)
+            if victory_bus.x==0:
+                yay.play()
+            if victory_parade:
+                move_victory_bus(victory_bus)
 
 
         #--------Update Display-------------------Update Display----------------Updat Display----------||       /__________
         pygame.display.update()    #-----------------------------------------------------------||       \
         #----------------------------------------------------------------------------------------------||       
 
-        if big_time_loser:
+        #reset the game board in time attack mode - done after display is updated in order to draw the 3 in a row and have a delay before game board is reset
+        if time_attack==True:
+            if victory_conditions()!=0:
+                pygame.time.wait(500)
+                reset_board()
+                
+            
+            if is_board_full():
+                pygame.time.wait(500)
+                reset_board()
+            
+            
+        
+        if big_time_loser: # for classic mode
             boo.play()
             pygame.time.wait(1000)
             reset_board()
